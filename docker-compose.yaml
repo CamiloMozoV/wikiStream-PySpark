@@ -23,6 +23,10 @@ services:
       - spark_network
     # volumes:
     #   - 
+    depends_on:
+      - kafka-wikistream
+    links:
+      - spark-kafka
   
   spark-worker:
     build: 
@@ -46,3 +50,44 @@ services:
     #   -
     depends_on:
       - spark-master
+      - kafka-wikistream
+    links:
+      - spark-kafka
+
+  spark-zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    restart: unless-stopped
+    networks:
+      - spark_network
+  
+  spark-kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_CREATE_TOPICS: "wikistream"
+      KAFKA_ZOOKEEPER_CONNECT: spark-zookeeper:2181
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock 
+    restart: unless-stopped
+    networks:
+      - spark_network
+    depends_on:
+      - spark-zookeeper
+  
+  kafka-wikistream:
+    build: 
+      context: kafkaWikiStream/
+      dockerfile: Dockerfile.kafkaProducer
+    image: kafka-wikistream
+    container_name: kafka-wikistream
+    networks:
+      - spark_network
+    depends_on:
+      - spark-zookeeper
+      - spark-kafka
