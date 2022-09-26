@@ -21,8 +21,8 @@ services:
       - "7077:7077"
     networks:
       - spark_network
-    # volumes:
-    #   - 
+    volumes:
+      - ./sparkApps/src/:/opt/bitnami/spark/apps/
     depends_on:
       - kafka-wikistream
     links:
@@ -46,8 +46,8 @@ services:
       - "8081:8081"
     networks:
       - spark_network
-    # volumes:
-    #   -
+    volumes:
+      - ./sparkApps/src/:/opt/bitnami/spark/apps/
     depends_on:
       - spark-master
       - kafka-wikistream
