@@ -4,7 +4,8 @@ from pyspark.sql.functions import (
     col, 
     from_unixtime, 
     to_date, 
-    to_timestamp
+    to_timestamp,
+    window
 )
 from pyspark.sql.types import (
     StringType,
@@ -112,17 +113,27 @@ def performs_some_transformation(df: DataFrame) -> DataFrame:
                                     
     return df_wikiStream_formatted
 
+
 def main(spark: SparkSession) -> None:
 
     data_raw = read_kafka_stream(spark)
     data_formatted = performs_some_transformation(data_raw)
-    data_formatted.writeStream\
+
+    df_count = data_formatted\
+                    .withWatermark("change_timestamp", "5 minutes")\
+                    .groupBy(
+                        window(data_formatted.change_timestamp, "5 minutes", "5 minutes"),
+                        data_formatted.user
+                    ).count()
+
+    df_count.writeStream\
                         .format("console")\
-                        .outputMode("append")\
+                        .outputMode("update")\
                         .option("checkpointLocation", "/opt/bitnami/spark/tmp/checkpoint")\
+                        .option("truncate", False)\
                         .start()\
                         .awaitTermination()
-                         
+      
 
 if __name__=="__main__":
     # Create a session
@@ -131,6 +142,7 @@ if __name__=="__main__":
             .master("spark://spark-master:7077")\
             .config("spark.jars", "/opt/bitnami/spark/jars/spark-sql-kafka-0-10_2.12-3.3.0.jar")\
             .config("spark.jars", "/opt/bitnami/spark/jars/spark-streaming-kafka-0-10_2.12-3.3.0.jar")\
+            .config("spark.sql.adaptive.enabled", False)\
             .getOrCreate()
 
     spark.sparkContext.setLogLevel("WARN")
