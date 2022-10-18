@@ -91,3 +91,19 @@ services:
     depends_on:
       - spark-zookeeper
       - spark-kafka
+  
+  minio-wikistream:
+    image: minio/minio
+    container_name: minioSparkStorage
+    environment:
+      - MINIO_ROOT_USER=testadmin
+      - MINIO_ROOT_PASSWORD=testadminpwd
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - spark_network
+    volumes:
+      - ./storageWikiStream:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped   

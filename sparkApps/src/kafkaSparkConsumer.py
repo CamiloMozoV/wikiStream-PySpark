@@ -119,20 +119,29 @@ def main(spark: SparkSession) -> None:
     data_raw = read_kafka_stream(spark)
     data_formatted = performs_some_transformation(data_raw)
 
-    df_count = data_formatted\
-                    .withWatermark("change_timestamp", "5 minutes")\
-                    .groupBy(
-                        window(data_formatted.change_timestamp, "5 minutes", "5 minutes"),
-                        data_formatted.user
-                    ).count()
+    data_formatted.writeStream\
+                    .format("parquet")\
+                    .option("path", "s3a://wikistream/stream/")\
+                    .option("checkpointLocation", "/opt/bitnami/spark/tmp/checkpoint")\
+                    .partitionBy("change_timestamp_date", "server_name")\
+                    .outputMode("append")\
+                    .start()\
+                    .awaitTermination()
 
-    df_count.writeStream\
-                        .format("console")\
-                        .outputMode("update")\
-                        .option("checkpointLocation", "/opt/bitnami/spark/tmp/checkpoint")\
-                        .option("truncate", False)\
-                        .start()\
-                        .awaitTermination()
+    # df_count = data_formatted\
+    #                 .withWatermark("change_timestamp", "5 minutes")\
+    #                 .groupBy(
+    #                     window(data_formatted.change_timestamp, "5 minutes", "5 minutes"),
+    #                     data_formatted.user
+    #                 ).count()
+
+    # df_count.writeStream\
+    #                     .format("console")\
+    #                     .outputMode("update")\
+    #                     .option("checkpointLocation", "/opt/bitnami/spark/tmp/checkpoint")\
+    #                     .option("truncate", False)\
+    #                     .start()\
+    #                     .awaitTermination()
       
 
 if __name__=="__main__":
@@ -142,8 +151,19 @@ if __name__=="__main__":
             .master("spark://spark-master:7077")\
             .config("spark.jars", "/opt/bitnami/spark/jars/spark-sql-kafka-0-10_2.12-3.3.0.jar")\
             .config("spark.jars", "/opt/bitnami/spark/jars/spark-streaming-kafka-0-10_2.12-3.3.0.jar")\
+            .config("spark.jars", "/opt/bitnami/spark/jars/hadoop-aws-3.3.4.jar") \
+            .config("spark.jars", "/opt/bitnami/spark/jars/aws-java-sdk-1.12.319.jar")\
+            .config("spark.jars", "/opt/bitnami/spark/jars/hadoop-common-3.3.4.jar")\
+            .config("spark.jars", "/opt/bitnami/spark/jars/hadoop-client-3.3.4.jar")\
+            .config("spark.jars", "/opt/bitnami/spark/jars/aws-java-sdk-s3-1.12.319.jar")\
             .config("spark.sql.adaptive.enabled", False)\
             .getOrCreate()
+    
+    spark.sparkContext._jsc.hadoopConfiguration().set("fs.s3a.access.key", "testadmin")
+    spark.sparkContext._jsc.hadoopConfiguration().set("fs.s3a.secret.key", "testadminpwd")
+    spark.sparkContext._jsc.hadoopConfiguration().set("fs.s3a.endpoint", "http://172.19.0.3:9000")
+    # spark.sparkContext._jsc.hadoopConfiguration().set("fs.s3a.connection.ssl.enabled", "false")
+
 
     spark.sparkContext.setLogLevel("WARN")
 
